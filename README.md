@@ -14,11 +14,11 @@ require __DIR__ . '/vendor/autoload.php';
 
 use Workerman\Worker;
 use Workerman\Lib\Timer;
-use Workerman\RedisQueue\Client;
+use Ledc\Redis\RedisQueueClient;
 
 $worker = new Worker();
 $worker->onWorkerStart = function () {
-    $client = new Client('redis://127.0.0.1:6379');
+    $client = new RedisQueueClient('redis://127.0.0.1:6379');
     $client->subscribe('user-1', function($data){
         echo "user-1\n";
         var_export($data);
