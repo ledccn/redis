@@ -206,8 +206,20 @@ class RedisQueueClient
                         $this->_redisSend->rPush($redis_key, $package_str);
                     } else {
                         $callback = $this->_subscribeQueues[$redis_key];
+                        $payload = new Payload($package);
                         try {
-                            \call_user_func($callback, $package['data']);
+                            \call_user_func($callback, $package['data'], $payload);
+                            // 支持自定义重试间隔和重试次数 2023年12月18日
+                            if ($payload->isReleased()) {
+                                $attempts = ++$package['attempts'];
+                                if ($payload->getMaxAttempts() < $attempts) {
+                                    $package['error'] = '任务重试次数超过最大值：' . $payload->getMaxAttempts();
+                                    $this->fail($package);
+                                } else {
+                                    $retry_delay = $payload->getRetryDelay() ?: $this->_options['retry_seconds'] * $attempts;
+                                    $this->_redisSend->zAdd($this->_options['prefix'] . static::QUEUE_DELAYED, time() + $retry_delay, \json_encode($package));
+                                }
+                            }
                         } catch (Throwable $e) {
                             if (++$package['attempts'] > $this->_options['max_attempts']) {
                                 $package['error'] = (string)$e;
